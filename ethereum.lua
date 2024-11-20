@@ -102,8 +102,18 @@ function decode_length(input, length)
 end
 
 function string.fromhex(str)
+    -- Убедимся, что строка имеет чётное количество символов
+    if #str % 2 ~= 0 then
+        error("Invalid hex string: length must be even")
+    end
+
+    -- Заменяем каждый 2-символьный сегмент на его значение в байтах
     return (str:gsub('..', function (cc)
-        return string.char(tonumber(cc, 16))
+        local byte = tonumber(cc, 16)
+        if not byte then
+            error("Invalid hex string: contains non-hex characters")
+        end
+        return string.char(byte)
     end))
 end
 
@@ -436,6 +446,8 @@ end
 
 -- dissect packet
 function devp2p.dissector (tvb, pinfo, tree)
+    -- dissect packet
+function devp2p.dissector (tvb, pinfo, tree)
     local subtree = tree:add(devp2p, tvb())
     local offset = 0
 
@@ -443,22 +455,44 @@ function devp2p.dissector (tvb, pinfo, tree)
     pinfo.cols.protocol = devp2p.name
 
     -- dissect field one by one, and add to protocol tree
+    if tvb:len() - offset < 32 then
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Not enough data for 'hash'")
+        return
+    end
     local hash = tvb(offset, 32)
     subtree:add(fields.hash, hash)
-    -- subtree:append_text(", hash: " .. hash)
     offset = offset + 32
 
+    if tvb:len() - offset < 65 then
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Not enough data for 'sign'")
+        return
+    end
     local sign = tvb(offset, 65)
     subtree:add(fields.sign, sign)
-    -- subtree:append_text(", sign: " .. sign)
     offset = offset + 65
 
+    if tvb:len() - offset < 1 then
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Not enough data for 'type'")
+        return
+    end
     local ptype = tvb(offset, 1):uint()
     subtree:add(fields.type, tvb(offset, 1))
-    pinfo.cols.info:append(" ("..types[ptype]..")")
-    subtree:append_text(" ("..types[ptype]..")")
+    
+    -- Проверка наличия значения в таблице types
+    local ptype_name = types[ptype] or "Unknown Type"
+    
+    -- Обновление колонок и текста
+    pinfo.cols.info:append(" (" .. ptype_name .. ")")
+    subtree:append_text(" (" .. ptype_name .. ")")
+    
     offset = offset + 1
 
+
+    -- Add payload
+    if tvb:len() - offset < 1 then
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Not enough data for 'payload'")
+        return
+    end
     local payload = tvb(offset)
     subtree:add(fields.payload, payload)
 

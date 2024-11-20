@@ -37,12 +37,12 @@ function rlp_decode(input)
     elseif type == 'list' then
         output = output .. "["
         local list_buf = string.sub(input, offset + 1, offset + dataLen)
-        -- message(string.tohex(list_buf))
+        -- payloadtree:add("hex list_buf: ", string.tohex(list_buf))
         local offset = 1
         while offset < #list_buf
         do
             local buf = string.sub(list_buf, offset, #list_buf)
-            -- message(string.tohex(buf))
+            -- payloadtree:add("buf: ", string.tohex(buf))
             local _offset, _dataLen, _type = decode_length(buf, #buf)
 
             local vbuf = ''
@@ -51,10 +51,10 @@ function rlp_decode(input)
             else
                 vbuf = string.sub(buf, _offset, _offset + _dataLen)
             end
-            -- message(_offset, _dataLen, _type, string.tohex(vbuf) )
+            -- payloadtree:add("hex vbuf: ", _offset, _dataLen, _type, string.tohex(vbuf) )
             local v = rlp_decode(vbuf)
-            -- message(_offset, _dataLen, _type, string.tohex(v) )
-            -- message(v)
+            -- payloadtree:add("hex v: ", _offset, _dataLen, _type, string.tohex(v) )
+            -- payloadtree:add("v: ", v)
 
             if #output > 1  then
                 output = output .. ", "
@@ -97,7 +97,7 @@ function decode_length(input, length)
         local listLen = bytes_to_int(string.sub(input, 2, lenOfListLen + 1))
         return 1 + lenOfListLen, listLen, 'list'
     else
-        message("input don't conform RLP encoding form")
+        print("input don't conform RLP encoding form")
     end
 end
 
@@ -465,12 +465,12 @@ function devp2p.dissector (tvb, pinfo, tree)
     ---- 协议细节
     local decodedvalue = rlp_decode(string.fromhex(tostring(payload:bytes())))
     local payloadtree = tree:add(subtree, tvb())
-    message(decodedvalue)
+    payloadtree:add("Decoded value:", decodedvalue)
 
     if types[ptype] == "PING" then
         payloadtree:set_text(decodedvalue)
         local version,fromip,fromudpport,fromtcpport,toip,toport,expiration = string.match(decodedvalue, '%[([^,]+), %[([^,]+), ([^,]+), ([^%]]+)%], %[([^,]+), ([^%]]+)%], ([^%]]+)%]')
-        message(version .. fromip .. fromudpport,fromtcpport,toip,toport,expiration)
+        payloadtree:add("Ping Details", version .. fromip .. fromudpport .. fromtcpport .. toip .. toport .. expiration)
         payloadtree:add("Version:", string.remove_quoted(version))
         payloadtree:add("From:", fromip, string.toport(string.remove_quoted(fromudpport)), string.toport(string.remove_quoted(fromtcpport)))
         payloadtree:add("To:", string.toip(string.remove_quoted(toip)) .. ":" .. string.toport(string.remove_quoted(toport)))
@@ -491,7 +491,7 @@ function devp2p.dissector (tvb, pinfo, tree)
         payloadtree:add("Expiration:", string.remove_quoted(expiration))
     elseif types[ptype] == "Neighbors" then
         payloadtree:set_text(decodedvalue)
-        message(decodedvalue)
+        payloadtree:add("Decoded value:", decodedvalue)
         local tablev = json.decode(decodedvalue)
         local cnt = 0
         -- payloadtree:set_text("Neighbors")

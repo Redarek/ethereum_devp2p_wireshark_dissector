@@ -446,8 +446,6 @@ end
 
 -- dissect packet
 function devp2p.dissector (tvb, pinfo, tree)
-    -- dissect packet
-function devp2p.dissector (tvb, pinfo, tree)
     local subtree = tree:add(devp2p, tvb())
     local offset = 0
 
